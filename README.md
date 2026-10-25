@@ -6,10 +6,15 @@ A standalone C# mod for **Captain of Industry** with six adjustable train
 parameters in a live in-game window. Defaults preserve vanilla behavior.
 Built against **0.8.7d / Update 4**. Experimental game APIs may change in later versions.
 
-**Validation status:** build and 48 headless integration checks pass against the
+**Validation status:** build and 60 headless integration checks pass against the
 installed game assemblies, including the menu constructor hook, native F8
-registration, simulation-side application and saved-value round-trip. Rendering
-and interaction of the live window in the running game still need manual validation.
+registration, simulation-side application, saved-value round-trip, and the load
+lifecycle with a capacity property missing until native post-load repair. Rendering
+and interaction of the live window and a full real-save reload still need manual validation.
+
+Version **0.1.1** fixes loading older saves: runtime property access is deferred from
+`EarlyInit` to `IMod.Initialize`, after the game's `InitAfterLoad` repair callbacks.
+Failed initialization also preserves the original error and removes installed hooks.
 
 | Setting | Range | Effect |
 | --- | --- | --- |
@@ -45,7 +50,7 @@ dotnet build TrainParameterMod.sln -c Release
 ```
 
 `Build.ps1` builds the solution, runs integration checks against your installed game
-assemblies, and creates `dist/TrainParameterMod-0.1.0.zip`.
+assemblies, and creates `dist/TrainParameterMod-0.1.1.zip`.
 Pass `-GameRoot 'D:\SteamLibrary\steamapps\common\Captain of Industry'` for a custom install.
 
 To build, check and install into your own mods directory:

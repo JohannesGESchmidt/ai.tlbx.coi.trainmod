@@ -2,7 +2,7 @@
   <PropertyGroup>
     <AssemblyName>TrainParameterMod</AssemblyName>
     <RootNamespace>TrainParameterMod</RootNamespace>
-    <Version>0.1.0</Version>
+    <Version>0.1.1</Version>
     <Description>Adjust train parameters live using an F8 in-game settings window.</Description>
   </PropertyGroup>
   <ItemGroup>

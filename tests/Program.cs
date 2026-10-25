@@ -108,6 +108,7 @@ internal static class Program
         }
         finally { harmony.UnpatchAll(TrainParameterMod.TrainParameterMod.Owner); SetSettings(TrainSettings.Vanilla); }
         Check(data.ScaleAccelerationBasedOnFunFactor(acceleration) == vanillaAcceleration, "patch teardown restores vanilla");
+        LoadLifecycleChecks.Run(root, Check);
     }
 
     private static T Empty<T>() => (T)FormatterServices.GetUninitializedObject(typeof(T));
@@ -131,6 +132,7 @@ internal static class Program
         trainList.Add(train);
         SetField(trains, typeof(TrainsManager), "m_trains", trainList);
         SetField(mod, typeof(TrainParameterMod.TrainParameterMod), "properties", properties);
+        SetField(mod, typeof(TrainParameterMod.TrainParameterMod), "capacityProperty", capacity);
         SetField(mod, typeof(TrainParameterMod.TrainParameterMod), "trains", trains);
         SetField(train, typeof(Train), "<IsReversed>k__BackingField", false);
         SetSettings(TrainSettings.Vanilla);

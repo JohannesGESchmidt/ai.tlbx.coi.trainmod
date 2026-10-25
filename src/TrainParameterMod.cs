@@ -14,11 +14,12 @@ using Mafi.Unity.InputControl;
 
 namespace TrainParameterMod;
 
-public sealed class TrainParameterMod : DataOnlyMod
+public sealed class TrainParameterMod : DataOnlyMod, IMod
 {
     internal const string Owner = "TrainParameterMod";
     private Harmony? harmony;
     private PropsDb? properties;
+    private IProperty<Percent>? capacityProperty;
     private TrainsManager? trains;
     private ISimLoopEvents? simEvents;
     private TrainSettings? pendingSettings;
@@ -35,29 +36,57 @@ public sealed class TrainParameterMod : DataOnlyMod
 
     public override void EarlyInit(DependencyResolver resolver)
     {
-        properties = resolver.Resolve<PropsDb>();
-        trains = resolver.Resolve<TrainsManager>();
-        simEvents = resolver.Resolve<ISimLoopEvents>();
+        // On save load this runs BEFORE the game's InitAfterLoad callbacks repair property tables.
+        // Only install hooks here; do not inspect or mutate loaded simulation objects yet.
         Volatile.Write(ref settings, TrainSettings.Read(JsonConfig));
         harmony = new Harmony(Owner);
         try
         {
             harmony.PatchAll(typeof(TrainParameterMod).Assembly);
+        }
+        catch
+        {
+            CleanupFailedInitialization();
+            throw;
+        }
+    }
+
+    // DataOnlyMod's Initialize is non-virtual. Reimplement this interface member explicitly
+    // so GameBuilder invokes it after all native InitAfterLoad callbacks have completed.
+    void IMod.Initialize(DependencyResolver resolver, bool gameWasLoaded) => InitializeGameState(
+        resolver.Resolve<PropsDb>(), resolver.Resolve<TrainsManager>(),
+        resolver.Resolve<ISimLoopEvents>(), resolver.Resolve<IGameLoopEvents>(), resolver);
+
+    internal void InitializeGameState(PropsDb loadedProperties, TrainsManager loadedTrains,
+        ISimLoopEvents loadedSimEvents, IGameLoopEvents gameLoop, DependencyResolver resolver)
+    {
+        try
+        {
+            properties = loadedProperties;
+            trains = loadedTrains;
+            simEvents = loadedSimEvents;
+            capacityProperty = properties.GetProperty(IdsCore.PropertyIds.TrainsCapacityMultiplier);
             ApplySettings();
             simEvents.UpdateBeforeCmdProc.AddNonSaveable(this, ProcessSettings);
             JsonConfig.OnValueChanged += OnSettingChanged;
             Active = this;
-            resolver.Resolve<IGameLoopEvents>().RegisterRendererInitState(this, InitializeMenu(resolver));
+            gameLoop.RegisterRendererInitState(this, InitializeMenu(resolver));
             Log.Info("Train Parameter Mod: active; live settings available with F8 or from the pause menu.");
         }
         catch
         {
-            harmony.UnpatchAll(Owner);
-            harmony = null;
-            properties.GetProperty(IdsCore.PropertyIds.TrainsCapacityMultiplier).TryRemoveModifier(Owner);
-            Volatile.Write(ref settings, TrainSettings.Vanilla);
+            CleanupFailedInitialization();
             throw;
         }
+    }
+
+    private void CleanupFailedInitialization()
+    {
+        // Never repeat the lookup that may have failed, or replace the original load exception.
+        try { capacityProperty?.TryRemoveModifier(Owner); }
+        catch (Exception ex) { Log.Warning("Train Parameter Mod: capacity cleanup failed: " + ex.Message); }
+        try { Dispose(); }
+        catch (Exception ex) { Log.Warning("Train Parameter Mod: hook cleanup failed: " + ex.Message); }
     }
 
     private void OnSettingChanged(string parameter)
@@ -90,8 +119,7 @@ public sealed class TrainParameterMod : DataOnlyMod
     {
         var next = TrainSettings.Read(JsonConfig);
         Volatile.Write(ref settings, next);
-        properties!.GetProperty(IdsCore.PropertyIds.TrainsCapacityMultiplier)
-            .AddOrSetModifier(Owner, next.CapacityDelta, Option<string>.Create(Owner));
+        capacityProperty!.AddOrSetModifier(Owner, next.CapacityDelta, Option<string>.Create(Owner));
         foreach (var train in trains!.Trains)
             TrainPatches.RefreshTopSpeed(train);
     }
@@ -109,6 +137,7 @@ public sealed class TrainParameterMod : DataOnlyMod
         harmony = null;
         Volatile.Write(ref settings, TrainSettings.Vanilla);
         properties = null;
+        capacityProperty = null;
         trains = null;
         simEvents = null;
         Active = null;
