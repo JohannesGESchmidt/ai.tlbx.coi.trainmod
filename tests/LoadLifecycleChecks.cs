@@ -78,7 +78,98 @@ internal static class LoadLifecycleChecks
             }
         }
         finally { failedMod.Dispose(); }
+
+        CheckAddedToExistingSave(root, check);
     }
+
+    private static void CheckAddedToExistingSave(string root, Action<bool, string> check)
+    {
+        using var manifestJson = System.Text.Json.JsonDocument.Parse(System.IO.File.ReadAllText(System.IO.Path.Combine(root, "manifest.json")));
+        check(manifestJson.RootElement.GetProperty("can_add_to_saved_game").GetBoolean(), "distributed manifest permits adding the mod to an existing save");
+        var manifest = new ModManifest(root, "TrainParameterMod", default, "Train Parameter Mod",
+            ImmutableArray<string>.Empty, canAddToSavedGame: true);
+        var mod = new TrainParameterMod.TrainParameterMod(manifest);
+        var worldConfig = new ExistingWorldConfig();
+        check(mod.JsonConfig.IsEmpty, "newly added mod starts without any saved parameters");
+        var configs = AttachNativeConfig(mod, new ImmutableArray<Mafi.Core.Game.IConfig>(new Mafi.Core.Game.IConfig[] { worldConfig }));
+        check(mod.JsonConfig.Parameters.Count == 6, "native game config attachment supplies all six parameters to a previously unmodded save");
+        var defaults = TrainSettings.Read(mod.JsonConfig);
+        check(defaults.CurveSlowdown == 1 && defaults.Acceleration == 1 && defaults.Capacity == 1 && defaults.Speed == 1 &&
+            defaults.Loading == 1 && defaults.Unloading == 1, "absence of saved mod values uses vanilla defaults for every parameter");
+        check(configs.Length == 2 && ReferenceEquals(configs[0], worldConfig) && ReferenceEquals(configs[1], mod.JsonConfig),
+            "native attachment preserves existing world config and registers the new mod config for saving");
+
+        var properties = Empty<PropsDb>();
+        var table = new Dict<string, IProperty>();
+        Set(properties, "m_properties", table);
+        var trainData = Empty<TrainStaticData>();
+        Set(trainData, nameof(TrainStaticData.MaxForwardsSpeedCombined), (Fix32.One / 10).Tiles());
+        Set(trainData, nameof(TrainStaticData.MaxBackwardSpeedCombined), (Fix32.One / 20).Tiles());
+        var train = Empty<Train>();
+        Set(train, "<Data>k__BackingField", trainData);
+        Set(train, "<IsReversed>k__BackingField", true);
+        Set(train, "<LifetimeDistanceTraveled>k__BackingField", Fix64.One * 123);
+        var trains = Empty<TrainsManager>();
+        var trainList = new Lyst<Train>();
+        trainList.Add(train);
+        Set(trains, "m_trains", trainList);
+        var sim = DispatchProxy.Create<ISimLoopEvents, SimRecorder>();
+        var events = (SimRecorder)(object)sim;
+        var loop = DispatchProxy.Create<IGameLoopEvents, LoopRecorder>();
+        try
+        {
+            ((IMod)mod).EarlyInit(null!);
+            check(table.Count == 0, "first add also tolerates the old save's incomplete property table during EarlyInit");
+            var capacity = new PropertyPercentMult(IdsCore.PropertyIds.TrainsCapacityMultiplier.Value, Percent.Hundred, new Notifications());
+            capacity.AddOrSetModifier("existing-difficulty", TrainSettings.Factor(0.5), default);
+            table.Add(capacity.Id, capacity);
+            mod.InitializeGameState(properties, trains, sim, loop, null!);
+            check(capacity.Value == TrainSettings.Factor(1.5), "first-add default capacity preserves existing difficulty or research modifiers");
+            check(train.MaxSpeed == trainData.MaxBackwardSpeedCombined, "first add initializes an existing reversed train at its native speed");
+
+            mod.QueueSettings(new TrainSettings(0.5, 2, 2, 3, 4, 5));
+            events.BeforeCommands.Fire();
+            check(capacity.Value == TrainSettings.Factor(3) && train.MaxSpeed == trainData.MaxBackwardSpeedCombined.ScaledBy(TrainSettings.Factor(3)),
+                "first-add live edits update existing train and capacity without rebuilding the train");
+            check(ReferenceEquals(train.Data, trainData) && train.IsReversed && train.LifetimeDistanceTraveled == Fix64.One * 123,
+                "adding the mod and applying settings preserves train data identity, direction and lifetime distance");
+
+            // The returned configs contain the same live config instance the game saves. Feed this
+            // saved-value container back into the actual native schema-attachment path on reload.
+            mod.Dispose();
+            var resumed = new TrainParameterMod.TrainParameterMod(manifest);
+            try
+            {
+                var restoredConfigs = AttachNativeConfig(resumed, configs);
+                var saved = TrainSettings.Read(resumed.JsonConfig);
+                check(saved.CurveSlowdown == 0.5 && saved.Acceleration == 2 && saved.Capacity == 2 && saved.Speed == 3 &&
+                    saved.Loading == 4 && saved.Unloading == 5, "next load restores all six values through native config attachment after first add");
+                check(ReferenceEquals(restoredConfigs[0], worldConfig), "next load still retains the pre-existing world config");
+                ((IMod)resumed).EarlyInit(null!);
+                resumed.InitializeGameState(properties, trains, sim, loop, null!);
+                check(capacity.Value == TrainSettings.Factor(3), "resuming replaces the saved owned capacity modifier without compounding bonuses");
+                check(train.MaxSpeed == trainData.MaxBackwardSpeedCombined.ScaledBy(TrainSettings.Factor(3)),
+                    "resuming reapplies the saved speed multiplier once to the existing train");
+            }
+            finally { resumed.Dispose(); }
+        }
+        finally { mod.Dispose(); }
+    }
+
+    private static ImmutableArray<Mafi.Core.Game.IConfig> AttachNativeConfig(TrainParameterMod.TrainParameterMod mod,
+        ImmutableArray<Mafi.Core.Game.IConfig> savedConfigs)
+    {
+        var loaded = new LoadedModData(mod.Manifest, Option<Type>.Create(mod.GetType()), ImmutableArray<Assembly>.Empty);
+        var builderType = typeof(IMod).Assembly.GetType("Mafi.Core.Game.GameBuilder", throwOnError: true)!;
+        var attach = builderType.GetMethod("AttachModJsonConfigs", BindingFlags.Static | BindingFlags.Public)!;
+        return (ImmutableArray<Mafi.Core.Game.IConfig>)attach.Invoke(null, new object[]
+        {
+            new ImmutableArray<LoadedModData>(new[] { loaded }),
+            new ImmutableArray<IMod>(new IMod[] { mod }), savedConfigs
+        })!;
+    }
+
+    private sealed class ExistingWorldConfig : Mafi.Core.Game.IConfig { }
 
     private static TrainParameterMod.TrainParameterMod CreateMod(string root)
     {
@@ -93,7 +184,7 @@ internal static class LoadLifecycleChecks
 
     private static T Empty<T>() => (T)FormatterServices.GetUninitializedObject(typeof(T));
     private static void Set(object target, string name, object value) =>
-        target.GetType().GetField(name, BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(target, value);
+        target.GetType().GetField(name, BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public)!.SetValue(target, value);
 
     private static int CountByOwner(this IEnumerable<MethodBase> methods)
     {

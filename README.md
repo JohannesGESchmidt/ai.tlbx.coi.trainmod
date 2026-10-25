@@ -6,11 +6,13 @@ A standalone C# mod for **Captain of Industry** with six adjustable train
 parameters in a live in-game window. Defaults preserve vanilla behavior.
 Built against **0.8.7d / Update 4**. Experimental game APIs may change in later versions.
 
-**Validation status:** build and 60 headless integration checks pass against the
+**Validation status:** build and 74 headless integration checks pass against the
 installed game assemblies, including the menu constructor hook, native F8
 registration, simulation-side application, saved-value round-trip, and the load
 lifecycle with a capacity property missing until native post-load repair. Rendering
 and interaction of the live window and a full real-save reload still need manual validation.
+The tests also exercise the game's actual config-attachment method when the mod
+is first added to an existing save, and when that modded save is subsequently resumed.
 
 Version **0.1.1** fixes loading older saves: runtime property access is deferred from
 `EarlyInit` to `IMod.Initialize`, after the game's `InitAfterLoad` repair callbacks.
@@ -82,6 +84,15 @@ Try a separate test save first. This mod does not add content or unlock DLC trai
 It modifies the trains available in your game. Removing it from a modded save is
 deliberately not advertised as safe: use defaults of 1 to restore standard behavior.
 Errors are logged to `%APPDATA%\Captain of Industry\Logs`.
+
+### Adding to an existing save
+
+The manifest permits adding this mod to a save that did not previously contain it.
+Missing saved mod settings receive the schema defaults (all six are 1), or the
+values you choose in the mod-selection screen. Existing train objects are reused;
+applying a neutral capacity modifier preserves the game's existing bonuses.
+After Apply and the next save/autosave, the game stores the mod settings with that
+save. Reloading reapplies them once, without multiplying a previously applied bonus again.
 
 ## Implementation
 
