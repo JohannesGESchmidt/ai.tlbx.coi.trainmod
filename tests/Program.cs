@@ -44,15 +44,13 @@ internal static class Program
         var acceleration = Fix64.One;
         var vanillaAcceleration = data.ScaleAccelerationBasedOnFunFactor(acceleration);
         // Patches can be installed without creating a Unity window or controlling the desktop.
-        foreach (var type in typeof(TrainPatches).GetNestedTypes(BindingFlags.NonPublic))
-            harmony.CreateClassProcessor(type).Patch();
-        harmony.CreateClassProcessor(typeof(PauseMenuPatch)).Patch();
+        harmony.PatchAll(typeof(TrainPatches).Assembly);
         try
         {
-            Check(Harmony.GetAllPatchedMethods().CountByOwner(TrainParameterMod.TrainParameterMod.Owner) == 6, "gameplay and pause-menu constructor targets patched");
+            Check(Harmony.GetAllPatchedMethods().CountByOwner(TrainParameterMod.TrainParameterMod.Owner) == 9, "gameplay, cargo-cycle, animation and pause-menu targets patched");
             Check(data.ScaleAccelerationBasedOnFunFactor(acceleration) == vanillaAcceleration, "default acceleration unchanged");
             SetSettings(new TrainSettings(1, 2, 1, 1, 3, 4));
-            Check(data.ScaleAccelerationBasedOnFunFactor(acceleration) == vanillaAcceleration * 2, "positive acceleration doubled");
+            Check(data.ScaleAccelerationBasedOnFunFactor(acceleration) == vanillaAcceleration, "small acceleration helper is left intact; final movement is patched instead");
             Check(data.ScaleAccelerationBasedOnFunFactor(-acceleration) == -vanillaAcceleration, "braking unchanged");
 
             var track = Empty<TrainTrackProto>();
@@ -92,9 +90,9 @@ internal static class Program
             SetField(station, typeof(TrainStationModule), "<TransferQuantity>k__BackingField", batch);
             SetSettings(new TrainSettings(1, 1, 1, 1, 3, 4));
             SetField(station, typeof(TrainStationModule), "<IsForLoading>k__BackingField", true);
-            Check(ReadTransfer(station) == batch.ScaledBy(TrainSettings.Factor(3)), "loading batch triples");
+            Check(ReadTransfer(station) == batch, "loading scales cycle time instead of batch quantity");
             SetField(station, typeof(TrainStationModule), "<IsForLoading>k__BackingField", false);
-            Check(ReadTransfer(station) == batch.ScaledBy(TrainSettings.Factor(4)), "unloading batch quadruples");
+            Check(ReadTransfer(station) == batch, "unloading scales cycle time instead of batch quantity");
 
             var notifications = new PropertyNotifications();
             var property = new PropertyPercentMult("test", Percent.Hundred, notifications);
@@ -109,6 +107,7 @@ internal static class Program
         finally { harmony.UnpatchAll(TrainParameterMod.TrainParameterMod.Owner); SetSettings(TrainSettings.Vanilla); }
         Check(data.ScaleAccelerationBasedOnFunFactor(acceleration) == vanillaAcceleration, "patch teardown restores vanilla");
         LoadLifecycleChecks.Run(root, Check);
+        MovementAndCargoChecks.Run(Check);
     }
 
     private static T Empty<T>() => (T)FormatterServices.GetUninitializedObject(typeof(T));

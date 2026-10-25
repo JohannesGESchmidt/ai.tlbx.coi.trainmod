@@ -9,7 +9,7 @@
     "default": 1.0,
     "min": 0.1,
     "max": 10.0,
-    "description": "Positive train acceleration multiplier. 1 = vanilla; 2 = twice as fast. Braking is unchanged."
+    "description": "Positive speed gain under engine traction per simulation tick. 1 = vanilla; 10 = ten times the acceleration. Braking and target-speed limits remain active."
   },
   "wagon_capacity_multiplier": {
     "default": 1.0,
@@ -27,12 +27,12 @@
     "default": 1.0,
     "min": 0.1,
     "max": 10.0,
-    "description": "Cargo loaded per station transfer batch. 1 = vanilla. Connection animations, batch timing and supply limits are unchanged."
+    "description": "Loading cycle speed, including connection, crane/transfer animations and disconnect. 10 = ten times faster; 0.1 = ten times slower. Supply and space limits still apply."
   },
   "unloading_speed_multiplier": {
     "default": 1.0,
     "min": 0.1,
     "max": 10.0,
-    "description": "Cargo unloaded per station transfer batch. 1 = vanilla. Connection animations, batch timing and destination capacity are unchanged."
+    "description": "Unloading cycle speed, including connection, crane/transfer animations, disconnect and molten-wagon tilt. 10 = ten times faster; 0.1 = ten times slower. Storage limits still apply."
   }
 }

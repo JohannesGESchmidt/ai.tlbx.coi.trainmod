@@ -1,6 +1,6 @@
 {
   "id": "TrainParameterMod",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "display_name": "Train Parameter Mod",
   "description_short": "Tune train curves, acceleration, wagon capacity, speed, loading and unloading live with F8. No save or reload needed.",
   "authors": "ai.tlbx",

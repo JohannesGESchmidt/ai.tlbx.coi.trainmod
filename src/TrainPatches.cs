@@ -1,7 +1,6 @@
 using System;
 using HarmonyLib;
 using Mafi;
-using Mafi.Base.Prototypes.Trains;
 using Mafi.Core.Trains;
 
 namespace TrainParameterMod;
@@ -50,23 +49,19 @@ internal static class TrainPatches
         }
     }
 
-    [HarmonyPatch(typeof(TrainStaticData), nameof(TrainStaticData.ScaleAccelerationBasedOnFunFactor))]
+    [HarmonyPatch(typeof(Train), "updateTrainMovementPhysics")]
     private static class Acceleration
     {
-        private static void Postfix(ref Fix64 __result)
+        private static void Postfix(Train __instance, RelTile1f targetSpeed, Fix64 ___m_speed,
+            ref Fix64 acceleration, ref Fix64 __result)
         {
-            if (__result.IsPositive)
-                __result = __result.ScaledBy(TrainSettings.Factor(TrainParameterMod.Settings.Acceleration));
-        }
-    }
-
-    [HarmonyPatch(typeof(TrainStationModule), nameof(TrainStationModule.TransferQuantity), MethodType.Getter)]
-    private static class CargoTransfer
-    {
-        private static void Postfix(TrainStationModule __instance, ref PartialQuantity __result)
-        {
-            var config = TrainParameterMod.Settings;
-            __result = __result.ScaledBy(TrainSettings.Factor(__instance.IsForLoading ? config.Loading : config.Unloading));
+            var multiplier = TrainParameterMod.Settings.Acceleration;
+            // Patch the final movement result, not a small helper the runtime can inline.
+            // Never amplify coasting, braking or a stop imposed by reservations/signals.
+            if (multiplier == 1 || __result <= ___m_speed || !__instance.AccelerationForceKnCurrent.IsPositive) return;
+            var increase = (__result - ___m_speed).ScaledBy(TrainSettings.Factor(multiplier));
+            __result = (___m_speed + increase).Min(targetSpeed.Value.ToFix64());
+            acceleration = __result - ___m_speed;
         }
     }
 }
