@@ -108,9 +108,33 @@ internal static class Program
         Check(data.ScaleAccelerationBasedOnFunFactor(acceleration) == vanillaAcceleration, "patch teardown restores vanilla");
         LoadLifecycleChecks.Run(root, Check);
         MovementAndCargoChecks.Run(Check);
+        CheckSteppedSettings(root);
     }
 
     private static T Empty<T>() => (T)FormatterServices.GetUninitializedObject(typeof(T));
+
+    private static void CheckSteppedSettings(string root)
+    {
+        Check(ModJsonConfig.TryLoadFromFile(Path.Combine(root, "config.json"), "TrainParameterMod", out var draft, out _), "slider draft loads the native schema");
+        foreach (var parameter in draft.Parameters.Values)
+        {
+            var setting = new SteppedSetting(draft, parameter);
+            Check(setting.Value == 1, parameter.Name + " slider starts at 1.0");
+            setting.SetTick(setting.Tick + 1);
+            Check(setting.Value == 1.1 && draft.GetDouble(parameter.Name) == 1.1, parameter.Name + " moves by exactly 0.1");
+            setting.SetTick(int.MaxValue);
+            Check(setting.Value == parameter.Max, parameter.Name + " slider clamps to the upper bound");
+            setting.SetTick(int.MinValue);
+            Check(setting.Value == parameter.Min, parameter.Name + " slider clamps to the lower bound");
+        }
+        draft.TrySetValue("speed_multiplier", 0.25, out _);
+        var oldSpeed = new SteppedSetting(draft, draft.Parameters["speed_multiplier"]);
+        Check(oldSpeed.Value == 0.3 && draft.GetDouble("speed_multiplier") == 0.3,
+            "an old non-tenth speed value is normalized only in the editable draft");
+        draft.ResetToDefaults();
+        oldSpeed.Refresh();
+        Check(oldSpeed.Value == 1 && draft.GetDouble("speed_multiplier") == 1, "restore defaults updates the slider draft back to 1.0");
+    }
 
     private static void CheckLiveSettings(string root, Train train)
     {

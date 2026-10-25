@@ -6,14 +6,15 @@ A standalone C# mod for **Captain of Industry** with six adjustable train
 parameters in a live in-game window. Defaults preserve vanilla behavior.
 Built against **0.8.7d / Update 4**. Experimental game APIs may change in later versions.
 
-**Validation status:** build and 90 headless integration checks pass against the
+**Validation status:** build and 123 headless integration checks pass against the
 installed game assemblies, including the menu constructor hook, native F8
 registration, simulation-side application, saved-value round-trip, and the load
 lifecycle with a capacity property missing until native post-load repair. The tests
 now execute native movement and complete cargo transfers: loading and unloading
 take 40 / 400 / 4000 ticks at 10x / 1x / 0.1x under sufficient supply and power.
 The menu, capacity and curve settings have player confirmation; the revised
-acceleration and cargo timing still need confirmation in the running game.
+acceleration, cargo timing, shared braking factor and stepped-slider layout still
+need confirmation in the running game.
 The tests also exercise the game's actual config-attachment method when the mod
 is first added to an existing save, and when that modded save is subsequently resumed.
 
@@ -25,12 +26,17 @@ Version **0.1.2** patches the final native movement result for acceleration and 
 the complete native cargo work cycle, including connection/disconnection and animations.
 It replaces the previous helper/getter hooks and keeps cargo quantity per batch unchanged.
 
+Version **0.1.3** applies the acceleration factor to native brake force too. The game's
+braking-distance estimates and curve/station braking all read the scaled force.
+The live menu uses native sliders with 0.1 steps, a value display, minus/plus buttons
+and left/right arrow-key control.
+
 | Setting | Range | Effect |
 | --- | --- | --- |
 | Curve slowdown factor | 0–5 | 1 = vanilla; 0 = no curve-specific speed cap; 0.5 = double the curve limit; 2 = half |
-| Acceleration multiplier | 0.1–10 | Scales actual positive speed gain under traction; braking and target-speed limits are unchanged |
+| Acceleration & braking multiplier | 0.1–10 | Scales positive speed gain under traction and native brake force; braking distances follow the same factor |
 | Wagon capacity multiplier | 0.1–10 | Multiplies cargo capacity in addition to difficulty/research modifiers |
-| Speed multiplier | 0.25–5 | Scales train top speed and rail limits; engine power can still limit actual speed |
+| Speed multiplier | 0.1–5 | Scales train top speed and rail limits; engine power can still limit actual speed |
 | Loading speed multiplier | 0.1–10 | Scales the complete loading clock, connection, crane/transfer cycle and disconnect |
 | Unloading speed multiplier | 0.1–10 | Scales the complete unloading clock, connection, crane/transfer cycle, disconnect and molten-wagon tilt |
 
@@ -39,8 +45,9 @@ Changes apply during the current session, including to existing trains and wagon
 Lowering capacity retains existing cargo; an over-capacity wagon can unload normally
 and cannot accept more cargo until space becomes available.
 
-Signals, braking distances, station/depot maneuvering limits, supply availability,
-and storage limits remain in effect. Cargo is moved through the native transfer
+Signals, station/depot maneuvering limits, supply availability and storage limits
+remain in effect. Native braking-distance prediction uses the selected brake force.
+Cargo is moved through the native transfer
 methods, with normal per-batch quantities and capacity checks. A fractional clock
 runs 0.1–10 logical cargo steps per simulation tick, retaining connection, animation,
 power and departure checks. Conveyor/pipe throughput and train alignment movement
@@ -63,7 +70,7 @@ dotnet build TrainParameterMod.sln -c Release
 ```
 
 `Build.ps1` builds the solution, runs integration checks against your installed game
-assemblies, and creates `dist/TrainParameterMod-0.1.2.zip`.
+assemblies, and creates `dist/TrainParameterMod-0.1.3.zip`.
 Pass `-GameRoot 'D:\SteamLibrary\steamapps\common\Captain of Industry'` for a custom install.
 
 To build, check and install into your own mods directory:
@@ -79,7 +86,8 @@ To build, check and install into your own mods directory:
 2. Start or restart the game. Select **Train Parameter Mod** when creating a game
    or adding mods to a save.
 3. In a running game, press **F8**, or use **Escape → Train Parameter Mod (F8)**.
-   Edit the six parameters and click **Apply**. Changes are submitted to the next
+   Move the six sliders in **0.1 steps** (or use minus/plus and the slider's left/right
+   arrow keys) and click **Apply**. Changes are submitted to the next
    simulation callback, including while paused; no save, exit or reload is required.
    Opening with F8 does not pause the simulation. Apply keeps the window open so
    you can adjust values repeatedly while observing your trains.
@@ -120,6 +128,7 @@ The implementation uses these game API points:
 | --- | --- |
 | Curve / rail limits | `EntityWithTrainTrackBaseProto.MaxSpeedTilesPerTick`, restricted to `TrainTrackProto`; `IsStraight` distinguishes curves |
 | Acceleration | Positive powered speed gain in the result of `Train.updateTrainMovementPhysics` |
+| Braking | `TrainStaticData.MaxBrakingForceKn`, scaled from a weakly held original per data object; cached stopping charts and each train's braking-distance estimate are refreshed |
 | Capacity | An owned delta modifier on `IdsCore.PropertyIds.TrainsCapacityMultiplier`; updates `CargoWagonProto.Capacity` and `SubCarCapacity` |
 | Top speed | `Train.updateCachedValues`, derived from `TrainStaticData.MaxForwardsSpeedCombined` / `MaxBackwardSpeedCombined`; manual target speed is capped consistently |
 | Loading / unloading | Native cargo-step calls in `TrainStationModule.SimUpdateInternal`, selected by `IsForLoading`; animation speed in `updateAnimation` and molten-wagon readiness methods |

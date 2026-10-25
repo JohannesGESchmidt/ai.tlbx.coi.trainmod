@@ -9,7 +9,7 @@
     "default": 1.0,
     "min": 0.1,
     "max": 10.0,
-    "description": "Positive speed gain under engine traction per simulation tick. 1 = vanilla; 10 = ten times the acceleration. Braking and target-speed limits remain active."
+    "description": "Acceleration and braking multiplier. 1 = vanilla; 10 = ten times the acceleration and native brake force. Braking-distance prediction follows the same factor."
   },
   "wagon_capacity_multiplier": {
     "default": 1.0,
@@ -19,7 +19,7 @@
   },
   "speed_multiplier": {
     "default": 1.0,
-    "min": 0.25,
+    "min": 0.1,
     "max": 5.0,
     "description": "Train top-speed and rail speed-limit multiplier. Available engine power still limits speed; station maneuvering limits and signals remain active."
   },

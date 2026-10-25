@@ -22,7 +22,7 @@ internal sealed class TrainSettings
         CurveSlowdown = Validate(curve, 0, 5);
         Acceleration = Validate(acceleration, 0.1, 10);
         Capacity = Validate(capacity, 0.1, 10);
-        Speed = Validate(speed, 0.25, 5);
+        Speed = Validate(speed, 0.1, 5);
         Loading = Validate(loading, 0.1, 10);
         Unloading = Validate(unloading, 0.1, 10);
     }

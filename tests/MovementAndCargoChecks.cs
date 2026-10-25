@@ -43,7 +43,8 @@ internal static class MovementAndCargoChecks
     {
         var train = Empty<Train>();
         var data = Empty<TrainStaticData>();
-        Set(data, "MaxBrakingForceKn", Fix32.One * 50);
+        var nativeBrakeForce = Fix32.One * 50;
+        Set(data, "MaxBrakingForceKn", nativeBrakeForce);
         Set(train, "<Data>k__BackingField", data);
         Set(train, "<MassTons>k__BackingField", Fix32.One * 100);
         Set(train, "<ClearanceThrottle>k__BackingField", Percent.Hundred);
@@ -52,25 +53,47 @@ internal static class MovementAndCargoChecks
         Set(train, "<SpeedLimitAhead>k__BackingField", Fix32.One.Tiles());
         var start = Fix64.One / 10;
         Set(train, "m_speed", start);
+        Set(train, "<Speed>k__BackingField", start.ToFix32().Tiles());
         Set(train, "<TargetSpeed>k__BackingField", Fix32.One.Tiles());
         var step = AccessTools.MethodDelegate<PhysicsStep>(AccessTools.Method(typeof(Train), "updateTrainMovementPhysics"));
         Settings(1, 1, 1);
+        TrainPatches.RefreshBraking(train);
         var vanilla = step(train, Fix32.One.Tiles(), out var vanillaAcceleration);
+        var vanillaDistance = train.BrakingDistance;
         check(vanilla > start, "actual native movement method produces positive acceleration on powered clear track");
         Settings(10, 1, 1);
+        TrainPatches.RefreshBraking(train);
         var fast = step(train, Fix32.One.Tiles(), out var fastAcceleration);
         check(Near(fast - start, (vanilla - start) * 10), "10x acceleration changes the actual next-step speed gain by 10x");
         check(fastAcceleration == fast - start, "reported acceleration matches the modified movement step");
         Settings(0.1, 1, 1);
+        TrainPatches.RefreshBraking(train);
         var slow = step(train, Fix32.One.Tiles(), out _);
         check(Near(slow - start, (vanilla - start) / 10), "0.1x acceleration reduces the actual next-step speed gain tenfold");
         Settings(1, 1, 1);
+        TrainPatches.RefreshBraking(train);
         var braking = step(train, (Fix32.One / 20).Tiles(), out _);
         Settings(10, 1, 1);
-        check(step(train, (Fix32.One / 20).Tiles(), out _) == braking, "actual native braking result is unchanged at 10x acceleration");
-        var target = (Fix32.One / 10 + Fix32.One / 10000).Tiles();
+        TrainPatches.RefreshBraking(train);
+        var fastBraking = step(train, (Fix32.One / 20).Tiles(), out _);
+        check(Near(start - fastBraking, (start - braking) * 10), "10x acceleration also multiplies actual native braking deceleration tenfold");
+        check(train.BrakingDistance < vanillaDistance, "10x brake force immediately shortens the native predicted braking distance");
+        TrainPatches.RefreshBraking(train);
+        check(data.MaxBrakingForceKn == nativeBrakeForce * 10, "repeated/shared-data refresh cannot compound the brake multiplier");
+        Settings(0.1, 1, 1);
+        TrainPatches.RefreshBraking(train);
+        var gentleBraking = step(train, (Fix32.One / 20).Tiles(), out _);
+        check(Near(start - gentleBraking, (start - braking) / 10), "0.1x brake factor reduces actual native braking tenfold");
+        check(train.BrakingDistance > vanillaDistance, "0.1x brake force lengthens the native braking distance for anticipation");
+        check(step(train, RelTile1f.Zero, out _) >= Fix64.Zero, "native braking at a stop target cannot produce negative speed");
+        Settings(10, 1, 1);
+        TrainPatches.RefreshBraking(train);
+        var target = (Fix32.One / 10 + Fix32.One / 100).Tiles();
         check(step(train, target, out _) <= target.Value.ToFix64(), "accelerated movement cannot overshoot the native target speed");
         Settings(1, 1, 1);
+        TrainPatches.RefreshBraking(train);
+        check(data.MaxBrakingForceKn == nativeBrakeForce && train.BrakingDistance == vanillaDistance,
+            "reset restores original brake force and native stopping distance");
         check(step(train, Fix32.One.Tiles(), out _) == vanilla, "reset restores the exact native next-step speed");
     }
 
