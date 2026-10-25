@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>TrainParameterMod.SmokeTests</AssemblyName>
+    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+    <!-- Uninitialized game entities are deliberate test fixtures; no game world is created. -->
+    <!-- The headless runner intentionally loads the exact net48 mod artifact on a modern CLR,
+         which supports the default interface methods used by the game's UI assemblies. -->
+    <NoWarn>$(NoWarn);SYSLIB0050;NU1702</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../src/TrainParameterMod.csproj" />
+    <Reference Include="Mafi.Unity"><HintPath>$(GameManaged)\Mafi.Unity.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="UnityEngine.CoreModule"><HintPath>$(GameManaged)\UnityEngine.CoreModule.dll</HintPath><Private>false</Private></Reference>
+  </ItemGroup>
+</Project>

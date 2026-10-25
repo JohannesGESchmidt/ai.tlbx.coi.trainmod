@@ -1,0 +1,13 @@
+{
+  "id": "TrainParameterMod",
+  "version": "0.1.0",
+  "display_name": "Train Parameter Mod",
+  "description_short": "Tune train curves, acceleration, wagon capacity, speed, loading and unloading live with F8. No save or reload needed.",
+  "authors": "ai.tlbx",
+  "primary_dlls": ["0Harmony.dll", "TrainParameterMod.dll"],
+  "min_game_version": "0.8.7d",
+  "max_verified_game_version": "0.8.7d",
+  "non_locking_dll_load": true,
+  "can_add_to_saved_game": true,
+  "can_remove_from_saved_game": false
+}

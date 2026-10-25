@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AssemblyName>TrainParameterMod</AssemblyName>
+    <RootNamespace>TrainParameterMod</RootNamespace>
+    <Version>0.1.0</Version>
+    <Description>Adjust train parameters live using an F8 in-game settings window.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Lib.Harmony" Version="2.4.2" />
+    <Reference Include="Mafi.Unity"><HintPath>$(GameManaged)\Mafi.Unity.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="Mafi.UnityCore"><HintPath>$(GameManaged)\Mafi.UnityCore.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="UnityEngine.CoreModule"><HintPath>$(GameManaged)\UnityEngine.CoreModule.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="UnityEngine.UIElementsModule"><HintPath>$(GameManaged)\UnityEngine.UIElementsModule.dll</HintPath><Private>false</Private></Reference>
+  </ItemGroup>
+</Project>

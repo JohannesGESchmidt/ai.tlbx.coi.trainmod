@@ -1,0 +1,38 @@
+{
+  "curve_slowdown_factor": {
+    "default": 1.0,
+    "min": 0.0,
+    "max": 5.0,
+    "description": "Curve slowdown: 1 = vanilla; 0 = no curve speed cap; 0.5 = twice the curve limit; 2 = half. Signals and braking remain active."
+  },
+  "acceleration_multiplier": {
+    "default": 1.0,
+    "min": 0.1,
+    "max": 10.0,
+    "description": "Positive train acceleration multiplier. 1 = vanilla; 2 = twice as fast. Braking is unchanged."
+  },
+  "wagon_capacity_multiplier": {
+    "default": 1.0,
+    "min": 0.1,
+    "max": 10.0,
+    "description": "Cargo wagon capacity multiplier, combined with difficulty/research bonuses. Existing cargo is retained when capacity decreases."
+  },
+  "speed_multiplier": {
+    "default": 1.0,
+    "min": 0.25,
+    "max": 5.0,
+    "description": "Train top-speed and rail speed-limit multiplier. Available engine power still limits speed; station maneuvering limits and signals remain active."
+  },
+  "loading_speed_multiplier": {
+    "default": 1.0,
+    "min": 0.1,
+    "max": 10.0,
+    "description": "Cargo loaded per station transfer batch. 1 = vanilla. Connection animations, batch timing and supply limits are unchanged."
+  },
+  "unloading_speed_multiplier": {
+    "default": 1.0,
+    "min": 0.1,
+    "max": 10.0,
+    "description": "Cargo unloaded per station transfer batch. 1 = vanilla. Connection animations, batch timing and destination capacity are unchanged."
+  }
+}
