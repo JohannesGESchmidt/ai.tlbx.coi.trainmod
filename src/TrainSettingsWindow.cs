@@ -38,7 +38,7 @@ internal sealed class TrainSettingsWindow : Window
         if (!ModJsonConfig.TryLoadFromFile(path, mod.Manifest.Id, out draft, out var error))
             throw new InvalidOperationException("Could not load train settings schema: " + error);
         draft.MergeSavedValues(mod.EditableSettings.ToValues());
-        var scroll = new ScrollColumn().FlexGrow(1f).FlexShrink(1f);
+        var scroll = new ScrollColumn().FlexGrow(1f).FlexShrink(1f).AlignSelfStretch().AlignItemsStretch();
         scroll.RootElement.style.minHeight = 0;
         foreach (var parameter in draft.Parameters.Values)
         {
@@ -78,10 +78,10 @@ internal sealed class TrainSettingsWindow : Window
         internal SliderRow(ModJsonConfig draft, ModJsonConfigParam parameter)
         {
             setting = new SteppedSetting(draft, parameter);
-            this.Gap(2.pt()).Padding(4.pt());
+            this.Gap(2.pt()).Padding(4.pt()).AlignSelfStretch().AlignItemsStretch();
             var title = parameter.Name == "acceleration_multiplier" ? "Acceleration & braking multiplier"
                 : CultureInfo.InvariantCulture.TextInfo.ToTitleCase(parameter.Name.Replace('_', ' '));
-            var heading = new Row(4.pt());
+            var heading = new Row(4.pt()).AlignSelfStretch().Width(100.Percent());
             heading.Add(new Label(title.AsLoc()).FlexGrow(1f));
             value = new Label().Width(60.px());
             heading.Add(value);
@@ -95,10 +95,12 @@ internal sealed class TrainSettingsWindow : Window
                 Change(setting.Tick + (evt.keyCode == KeyCode.LeftArrow ? -1 : 1));
                 evt.StopPropagation();
             });
-            var input = new Row(4.pt());
-            input.Add(new ButtonText("−".AsLoc(), () => Change(setting.Tick - 1)).Width(32.px()));
+            var input = new Row(4.pt()).AlignSelfStretch().Width(100.Percent());
+            slider.FlexGrow(1f).FlexShrink(1f).AlignSelfStretch();
+            slider.RootElement.style.minWidth = 0;
+            input.Add(new ButtonText("−".AsLoc(), () => Change(setting.Tick - 1)).Width(32.px()).FlexShrink(0));
             input.Add(slider);
-            input.Add(new ButtonText("+".AsLoc(), () => Change(setting.Tick + 1)).Width(32.px()));
+            input.Add(new ButtonText("+".AsLoc(), () => Change(setting.Tick + 1)).Width(32.px()).FlexShrink(0));
             Add(input, new Label(parameter.Description.AsLoc()));
             Refresh();
         }

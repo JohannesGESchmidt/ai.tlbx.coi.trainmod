@@ -4,6 +4,7 @@ using System.Runtime.Serialization;
 using HarmonyLib;
 using Mafi;
 using Mafi.Base.Prototypes.Trains;
+using Mafi.Collections;
 using Mafi.Collections.ImmutableCollections;
 using Mafi.Core;
 using Mafi.Core.Entities;
@@ -30,6 +31,7 @@ internal static class MovementAndCargoChecks
         {
             CheckMovement(check);
             CheckCargo(check);
+            CheckPooledCargo(check);
         }
         finally
         {
@@ -122,6 +124,131 @@ internal static class MovementAndCargoChecks
         var moltenSlow = MoltenDepartureDuration(0.1);
         check(molten10 < molten1 && molten1 < moltenSlow,
             $"native molten-wagon upright animation scales at 10x / 1x / 0.1x: {molten10} / {molten1} / {moltenSlow} ticks");
+    }
+
+    private static void CheckPooledCargo(Action<bool, string> check)
+    {
+        foreach (var count in new[] { 2, 4 })
+        foreach (var loading in new[] { true, false })
+        foreach (var rate in new[] { 0.1, 1, 10 })
+        {
+            Settings(1, rate, rate);
+            var product = Empty<LooseProductProto>();
+            var wagonProto = Empty<CargoWagonProto>();
+            Set(wagonProto, "<Capacity>k__BackingField", (100 * count).Quantity());
+            Set(wagonProto, "<SubCarCapacity>k__BackingField", 100.Quantity());
+            Set(wagonProto, "ProductType", product.Type);
+            var wagon = Empty<CargoWagon>();
+            Set(wagon, "<Prototype>k__BackingField", wagonProto);
+            typeof(TrainCarBase).GetField("<Prototype>k__BackingField", BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(wagon, wagonProto);
+            var stations = new TrainStationModule[count];
+            var cars = new CargoWagon.SubCargoWagon[count];
+            var buffers = new ProductBuffer[count];
+            var entries = new Lyst<TrainStationGroup.StationAndDirection>();
+            var manager = Empty<TrainStationManager>();
+            var groups = new Dict<ITrainStationBase, TrainStationGroup>();
+            var group = Empty<TrainStationGroup>();
+            Set(manager, "m_trainStationEntities", groups);
+            Set(group, "m_forwardEdgeStationEntities", entries);
+            Set(group, "m_reverseEdgeStationEntities", new Lyst<TrainStationGroup.StationAndDirection>());
+            for (var i = 0; i < count; i++)
+            {
+                var proto = Empty<TrainStationModuleProto>();
+                Set(proto, "TransferPeriod", 20.Ticks());
+                Set(proto, "ConnectionCompletionPerStepWhenLoading", 10.Percent());
+                Set(proto, "ConnectionCompletionPerStepWhenUnloading", 10.Percent());
+                Set(proto, "Graphics", Empty<TrainStationModuleProto.Gfx>());
+                var station = stations[i] = Empty<TrainStationModule>();
+                Set(station, "m_id", new EntityId(i + 1));
+                Set(station, "m_proto", proto);
+                Set(station, "<IsEnabled>k__BackingField", true);
+                Set(station, "<IsForLoading>k__BackingField", loading);
+                Set(station, "<TransferQuantity>k__BackingField", 5.Quantity().AsPartial);
+                Set(station, "m_consumedPower", true);
+                Set(station, "m_stationManager", manager);
+                // All supply/free space starts at one end, the other modules cannot serve alone.
+                var capacity = i == 0 ? 100 * count : 100;
+                var buffer = buffers[i] = new ProductBuffer(capacity.Quantity(), product);
+                if (loading ? i == 0 : i != 0) buffer.StoreAsMuchAs(capacity.Quantity());
+                Set(station, "m_buffer", Option<ProductBuffer>.Create(buffer));
+                entries.Add(new TrainStationGroup.StationAndDirection(station, TrainTrackTrajectoryDirection.Forward));
+                groups.Add(station, group);
+                cars[i] = new CargoWagon.SubCargoWagon(wagon, i, new ProductQuantity(product, (loading ? 0 : 100).Quantity()), default);
+                cars[i].SetAlignedStation(Option<ITrainStationModule>.Create(station));
+            }
+            wagon.SubCars = new ImmutableArray<TrainCarBase.TrainSubCarBase>(cars);
+            if (count == 4 && loading && rate == 1)
+            {
+                var target = stations[3];
+                Set(stations[1], "<IsEnabled>k__BackingField", false);
+                StationCargoPool.Prepare(target);
+                check(buffers[3].Quantity.IsZero, "pool does not cross a disabled module");
+                Set(stations[1], "<IsEnabled>k__BackingField", true);
+                Set(stations[1], "<IsBalancingDisabled>k__BackingField", true);
+                StationCargoPool.Prepare(target);
+                check(buffers[3].Quantity.IsZero, "pool does not cross a module with balancing disabled");
+                Set(stations[1], "<IsBalancingDisabled>k__BackingField", false);
+                Set(stations[1], "<IsForLoading>k__BackingField", false);
+                StationCargoPool.Prepare(target);
+                check(buffers[3].Quantity.IsZero, "loading and unloading modules have separate pools");
+                Set(stations[1], "<IsForLoading>k__BackingField", true);
+                var otherProduct = Empty<LooseProductProto>();
+                Set(otherProduct, "<Id>k__BackingField", new Mafi.Core.Prototypes.Proto.ID("OtherProduct"));
+                Set(stations[1], "m_buffer", Option<ProductBuffer>.Create(new ProductBuffer(100.Quantity(), otherProduct)));
+                StationCargoPool.Prepare(target);
+                check(buffers[3].Quantity.IsZero, "pool does not cross a different product");
+                Set(stations[1], "m_buffer", Option<ProductBuffer>.Create(buffers[1]));
+                entries[2] = new TrainStationGroup.StationAndDirection(stations[2], TrainTrackTrajectoryDirection.Backward);
+                StationCargoPool.Prepare(target);
+                check(buffers[3].Quantity.IsZero, "opposite station sides have separate pools");
+                entries[2] = new TrainStationGroup.StationAndDirection(stations[2], TrainTrackTrajectoryDirection.Forward);
+                Set(group, "m_forwardEdgeStationEntities", new Lyst<TrainStationGroup.StationAndDirection>());
+                Set(group, "m_reverseEdgeStationEntities", entries);
+                target.RequestWagonLoad(cars[3], _ => true, out var active);
+                check(active && buffers[3].Quantity.IsPositive,
+                    "native request starts from an empty local buffer using the reverse-edge shared pool");
+                check(AccessTools.Field(typeof(TrainStationModule), "m_wagonRequest").GetValue(target) != null,
+                    "pooled request creates an actual native wagon-service request");
+                Set(group, "m_forwardEdgeStationEntities", entries);
+                Set(group, "m_reverseEdgeStationEntities", new Lyst<TrainStationGroup.StationAndDirection>());
+            }
+            var equal = true;
+            var ticks = 0;
+            var before = Total();
+            while ((loading ? !cars[0].IsFullForLoading : !cars[0].IsEmpty) && ticks < 10000)
+            {
+                for (var i = 0; i < count; i++)
+                {
+                    if (loading) stations[i].RequestWagonLoad(cars[i], _ => true, out _);
+                    else stations[i].RequestWagonUnload(cars[i], _ => true, out _);
+                    if (loading) CargoCyclePatches.AdvanceLoading(stations[i], wagon, i);
+                    else CargoCyclePatches.AdvanceUnloading(stations[i], wagon, i);
+                }
+                for (var i = 1; i < count; i++) equal &= cars[i].Cargo.Quantity == cars[0].Cargo.Quantity;
+                ticks++;
+            }
+            check(equal && ticks < 10000, $"{count} pooled modules {(loading ? "load" : "unload")} all wagon parts equally at {rate}x ({ticks} ticks)");
+            check(Total() == before, "pooled native cargo cycles conserve all station and wagon stock");
+
+            // With pooling disabled the empty/full target must stay isolated.
+            var isolatedStation = loading ? stations[count - 1] : stations[0];
+            var targetBuffer = loading ? buffers[count - 1] : buffers[0];
+            if (loading) targetBuffer.RemoveAsMuchAs(targetBuffer.Quantity);
+            else targetBuffer.StoreAsMuchAs(targetBuffer.UsableCapacity);
+            if (loading) buffers[0].StoreAsMuchAs(100.Quantity());
+            else buffers[count - 1].RemoveAsMuchAs(100.Quantity());
+            Set(isolatedStation, "<IsBalancingDisabled>k__BackingField", true);
+            var isolated = targetBuffer.Quantity;
+            StationCargoPool.Prepare(isolatedStation);
+            check(targetBuffer.Quantity == isolated, "explicit balancing disable is preserved");
+
+            Quantity Total()
+            {
+                var result = Quantity.Zero;
+                for (var i = 0; i < count; i++) result += buffers[i].Quantity + cars[i].Cargo.Quantity;
+                return result;
+            }
+        }
     }
 
     private static int CargoDuration(bool loading, double rate, out int disconnectTicks)

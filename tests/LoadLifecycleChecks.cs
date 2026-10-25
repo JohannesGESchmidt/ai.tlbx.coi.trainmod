@@ -38,7 +38,7 @@ internal static class LoadLifecycleChecks
             check(originalLookupFails, "older-save fixture reproduces the native missing-capacity-property exception");
             ((IMod)mod).EarlyInit(null!);
             check(table.Count == 0, "saved-game EarlyInit tolerates a missing capacity property without modifying the table");
-            check(Harmony.GetAllPatchedMethods().CountByOwner() == 9, "actual mod EarlyInit installs all hooks before native load callbacks");
+            check(Harmony.GetAllPatchedMethods().CountByOwner() == 11, "actual mod EarlyInit installs all hooks before native load callbacks");
             check(loopRecorder.RendererRegistrations == 0, "UI initialization is deferred until the game has finished loading");
 
             // Represent the native InitAfterLoad repair, before GameBuilder dispatches Initialize.

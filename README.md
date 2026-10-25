@@ -3,10 +3,10 @@
 ![Train Parameter Mod](assets/train-parameter-mod.jpg)
 
 A standalone C# mod for **Captain of Industry** with six adjustable train
-parameters in a live in-game window. Defaults preserve vanilla behavior.
+parameters in a live in-game window. Parameter defaults are all 1.
 Built against **0.8.7d / Update 4**. Experimental game APIs may change in later versions.
 
-**Validation status:** build and 123 headless integration checks pass against the
+**Validation status:** build and 166 headless integration checks pass against the
 installed game assemblies, including the menu constructor hook, native F8
 registration, simulation-side application, saved-value round-trip, and the load
 lifecycle with a capacity property missing until native post-load repair. The tests
@@ -30,6 +30,15 @@ Version **0.1.3** applies the acceleration factor to native brake force too. The
 braking-distance estimates and curve/station braking all read the scaled force.
 The live menu uses native sliders with 0.1 steps, a value display, minus/plus buttons
 and left/right arrow-key control.
+
+Version **0.1.4** stretches sliders across the settings window. Cargo cycles draw
+from compatible connected module buffers, removing the slow inter-module balancing
+bottleneck. Two/four-module tests load and unload every wagon part equally per tick
+at 0.1x, 1x and 10x, even with supply/free space concentrated at one end. Total
+stock is conserved. Disabled modules, disabled balancing, different products,
+loading modes and opposite station sides remain separate. External supply/output
+rates, power, workers and native wagon restrictions still apply. Visual slider
+layout and these station changes need confirmation in the running game.
 
 | Setting | Range | Effect |
 | --- | --- | --- |
@@ -70,7 +79,7 @@ dotnet build TrainParameterMod.sln -c Release
 ```
 
 `Build.ps1` builds the solution, runs integration checks against your installed game
-assemblies, and creates `dist/TrainParameterMod-0.1.3.zip`.
+assemblies, and creates `dist/TrainParameterMod-0.1.4.zip`.
 Pass `-GameRoot 'D:\SteamLibrary\steamapps\common\Captain of Industry'` for a custom install.
 
 To build, check and install into your own mods directory:

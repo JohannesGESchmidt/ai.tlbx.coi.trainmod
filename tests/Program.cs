@@ -47,7 +47,7 @@ internal static class Program
         harmony.PatchAll(typeof(TrainPatches).Assembly);
         try
         {
-            Check(Harmony.GetAllPatchedMethods().CountByOwner(TrainParameterMod.TrainParameterMod.Owner) == 9, "gameplay, cargo-cycle, animation and pause-menu targets patched");
+            Check(Harmony.GetAllPatchedMethods().CountByOwner(TrainParameterMod.TrainParameterMod.Owner) == 11, "gameplay, cargo-cycle, pooled requests, animation and pause-menu targets patched");
             Check(data.ScaleAccelerationBasedOnFunFactor(acceleration) == vanillaAcceleration, "default acceleration unchanged");
             SetSettings(new TrainSettings(1, 2, 1, 1, 3, 4));
             Check(data.ScaleAccelerationBasedOnFunFactor(acceleration) == vanillaAcceleration, "small acceleration helper is left intact; final movement is patched instead");

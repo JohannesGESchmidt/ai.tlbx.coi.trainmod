@@ -47,6 +47,7 @@ internal static class CargoCyclePatches
     private static void AdvanceCargo(TrainStationModule station, CargoWagon wagon, int index,
         Action<TrainStationModule, CargoWagon, int> nativeStep)
     {
+        StationCargoPool.Prepare(station);
         var steps = Clocks.GetOrCreateValue(station).Advance(Rate(station));
         if (steps == 0)
         {
@@ -63,7 +64,11 @@ internal static class CargoCyclePatches
         nativeWorkDepth++;
         try
         {
-            for (var i = 0; i < steps; i++) nativeStep(station, wagon, index);
+            for (var i = 0; i < steps; i++)
+            {
+                StationCargoPool.Prepare(station);
+                nativeStep(station, wagon, index);
+            }
         }
         finally { nativeWorkDepth--; }
     }
