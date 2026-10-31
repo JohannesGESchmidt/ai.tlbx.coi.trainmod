@@ -10,14 +10,18 @@ if (!(Test-Path -LiteralPath (Join-Path $GameRoot 'Captain of Industry_Data/Mana
 }
 Push-Location $repoRoot
 try {
+    $manifest = Get-Content ./manifest.json -Raw | ConvertFrom-Json
+    $changelogHeader = Get-Content ./changelog.txt -TotalCount 1
+    if ($changelogHeader -notmatch ('^v' + [regex]::Escape($manifest.version) + ' \| \d{4}-\d{2}-\d{2}$')) {
+        throw "changelog.txt must start with v$($manifest.version) | YYYY-MM-DD."
+    }
     dotnet build TrainParameterMod.sln -c Release "-p:COI_ROOT=$GameRoot"
     if ($LASTEXITCODE -ne 0) { throw 'dotnet build failed.' }
     dotnet ./tests/bin/Release/net10.0/TrainParameterMod.SmokeTests.dll $GameRoot $repoRoot
     if ($LASTEXITCODE -ne 0) { throw 'Integration checks failed.' }
-    $manifest = Get-Content ./manifest.json -Raw | ConvertFrom-Json
     $package = Join-Path $repoRoot "dist/$($manifest.id)"
     New-Item -ItemType Directory -Path $package -Force | Out-Null
-    foreach ($file in @('manifest.json', 'config.json', 'LICENSE', 'README.md')) {
+    foreach ($file in @('manifest.json', 'config.json', 'changelog.txt', 'LICENSE', 'README.md')) {
         Copy-Item -LiteralPath (Join-Path $repoRoot $file) -Destination $package
     }
     Copy-Item ./assets/thumbnail.png $package

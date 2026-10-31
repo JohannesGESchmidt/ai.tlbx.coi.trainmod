@@ -4,7 +4,7 @@
 
 A standalone C# mod for **Captain of Industry** with six adjustable train
 parameters in a live in-game window. Parameter defaults are all 1.
-Built against **0.8.8 / Update 4.3** (build 624). Version 0.1.5 requires 0.8.8.
+Built against **0.8.8 / Update 4.3** (build 624). Version 0.1.6 requires 0.8.8.
 Experimental game APIs may change in later versions.
 
 [COI Hub page](https://coigame.com/Mod/1253/Train-Parameter-Mod)
@@ -48,6 +48,9 @@ and is registered during game initialization. Station pooling uses native mixed-
 transfers so cargo composition is preserved, and separates shielded and unshielded
 modules. Acceleration preserves the game's new coasting-to-speed-limit state.
 
+Version **0.1.6** adds the COI Hub-compatible `changelog.txt` to the release ZIP
+and checks that its latest entry matches the mod version. Gameplay is unchanged.
+
 | Setting | Range | Effect |
 | --- | --- | --- |
 | Curve slowdown factor | 0–5 | 1 = vanilla; 0 = no curve-specific speed cap; 0.5 = double the curve limit; 2 = half |
@@ -87,7 +90,8 @@ dotnet build TrainParameterMod.sln -c Release
 ```
 
 `Build.ps1` builds the solution, runs integration checks against your installed game
-assemblies, and creates `dist/TrainParameterMod-0.1.5.zip`.
+assemblies, and creates `dist/TrainParameterMod-0.1.6.zip`, including the changelog
+next to `manifest.json` for the COI Hub Changelog tab.
 Pass `-GameRoot 'D:\SteamLibrary\steamapps\common\Captain of Industry'` for a custom install.
 
 To build, check and install into your own mods directory:
