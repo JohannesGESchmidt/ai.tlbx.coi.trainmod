@@ -4,19 +4,23 @@
 
 A standalone C# mod for **Captain of Industry** with six adjustable train
 parameters in a live in-game window. Parameter defaults are all 1.
-Built against **0.8.7d / Update 4**. Experimental game APIs may change in later versions.
+Built against **0.8.8 / Update 4.3** (build 624). Version 0.1.5 requires 0.8.8.
+Experimental game APIs may change in later versions.
 
-**Validation status:** build and 166 headless integration checks pass against the
+[COI Hub page](https://coigame.com/Mod/1253/Train-Parameter-Mod)
+
+**Validation status:** build and 170 headless integration checks pass against the
 installed game assemblies, including the menu constructor hook, native F8
 registration, simulation-side application, saved-value round-trip, and the load
 lifecycle with a capacity property missing until native post-load repair. The tests
 now execute native movement and complete cargo transfers: loading and unloading
-take 40 / 400 / 4000 ticks at 10x / 1x / 0.1x under sufficient supply and power.
-The menu, capacity and curve settings have player confirmation; the revised
-acceleration, cargo timing, shared braking factor and stepped-slider layout still
-need confirmation in the running game.
+take 41 / 410 / 4100 ticks at 10x / 1x / 0.1x under sufficient supply and power.
+The 0.8.8 release also passed the author's in-game acceptance test.
 The tests also exercise the game's actual config-attachment method when the mod
 is first added to an existing save, and when that modded save is subsequently resumed.
+Unity 6.3 uses a font-class layout that CoreCLR cannot load. The headless runner
+normalizes only that metadata flag in an ignored test-only DLL copy; game files,
+method bodies, and the distributed mod are unchanged. This does not validate UI rendering.
 
 Version **0.1.1** fixes loading older saves: runtime property access is deferred from
 `EarlyInit` to `IMod.Initialize`, after the game's `InitAfterLoad` repair callbacks.
@@ -37,8 +41,12 @@ bottleneck. Two/four-module tests load and unload every wagon part equally per t
 at 0.1x, 1x and 10x, even with supply/free space concentrated at one end. Total
 stock is conserved. Disabled modules, disabled balancing, different products,
 loading modes and opposite station sides remain separate. External supply/output
-rates, power, workers and native wagon restrictions still apply. Visual slider
-layout and these station changes need confirmation in the running game.
+rates, power, workers and native wagon restrictions still apply.
+
+Version **0.1.5** supports game 0.8.8: F8 uses the new native shortcut registry
+and is registered during game initialization. Station pooling uses native mixed-buffer
+transfers so cargo composition is preserved, and separates shielded and unshielded
+modules. Acceleration preserves the game's new coasting-to-speed-limit state.
 
 | Setting | Range | Effect |
 | --- | --- | --- |
@@ -79,7 +87,7 @@ dotnet build TrainParameterMod.sln -c Release
 ```
 
 `Build.ps1` builds the solution, runs integration checks against your installed game
-assemblies, and creates `dist/TrainParameterMod-0.1.4.zip`.
+assemblies, and creates `dist/TrainParameterMod-0.1.5.zip`.
 Pass `-GameRoot 'D:\SteamLibrary\steamapps\common\Captain of Industry'` for a custom install.
 
 To build, check and install into your own mods directory:
@@ -145,6 +153,21 @@ The implementation uses these game API points:
 Harmony applies small runtime hooks. No game DLLs, original game assets, decompiled
 game implementations, private project code, credentials or machine configuration
 are included. Building requires your own game installation.
+
+## COI Hub code analysis: why these capabilities are used
+
+- **Uses Harmony:** The mod patches train and station methods while the game is
+  running so the selected multipliers affect existing trains and cargo cycles.
+  Harmony also adds the settings entry to the pause menu.
+- **Generates code at runtime:** Harmony and its access helpers create method
+  wrappers and delegates in memory to apply these patches and call internal game
+  methods. The patch definitions are included in the mod's source code.
+- **Uses reflection by name:** The mod looks up specific train and station methods,
+  fields and property setters for speed, braking, cargo timing and connected station
+  buffers, where the required operations are not exposed through public APIs.
+  These lookup names are fixed in the source code.
+
+Source code: https://github.com/JohannesGESchmidt/ai.tlbx.coi.trainmod
 
 ## Artwork and licenses
 

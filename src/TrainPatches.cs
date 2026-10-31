@@ -83,13 +83,13 @@ internal static class TrainPatches
     [HarmonyPatch(typeof(Train), "updateTrainMovementPhysics")]
     private static class Acceleration
     {
-        private static void Postfix(Train __instance, RelTile1f targetSpeed, Fix64 ___m_speed,
+        private static void Postfix(Train __instance, RelTile1f targetSpeed, bool coastingToSpeedLimit, Fix64 ___m_speed,
             ref Fix64 acceleration, ref Fix64 __result)
         {
             var multiplier = TrainParameterMod.Settings.Acceleration;
             // Patch the final movement result, not a small helper the runtime can inline.
             // Never amplify coasting, braking or a stop imposed by reservations/signals.
-            if (multiplier == 1 || __result <= ___m_speed || !__instance.AccelerationForceKnCurrent.IsPositive) return;
+            if (multiplier == 1 || coastingToSpeedLimit || __result <= ___m_speed || !__instance.AccelerationForceKnCurrent.IsPositive) return;
             var increase = (__result - ___m_speed).ScaledBy(TrainSettings.Factor(multiplier));
             __result = (___m_speed + increase).Min(targetSpeed.Value.ToFix64());
             acceleration = __result - ___m_speed;

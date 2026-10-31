@@ -21,7 +21,10 @@ internal static class Program
         var managed = Path.Combine(args[0], "Captain of Industry_Data", "Managed");
         AppDomain.CurrentDomain.AssemblyResolve += (_, request) =>
         {
-            var path = Path.Combine(managed, new AssemblyName(request.Name).Name + ".dll");
+            var name = new AssemblyName(request.Name).Name;
+            var path = Path.Combine(managed, name + ".dll");
+            if (name == "UnityEngine.TextCoreTextEngineModule" && File.Exists(path))
+                path = HeadlessUnityCompatibility.TextCoreAssembly(path, args[1]);
             return File.Exists(path) ? Assembly.LoadFrom(path) : null;
         };
         try { Run(args[1]); Console.WriteLine($"PASS: {checks} integration checks against installed game assemblies."); return 0; }
@@ -31,6 +34,9 @@ internal static class Program
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static void Run(string root)
     {
+        var gameVersion = typeof(Mafi.AssemblyInfo)
+            .GetField("VERSION_FULL")!.GetRawConstantValue();
+        Check(Equals(gameVersion, "0.8.8"), "integration checks use Captain of Industry 0.8.8: " + gameVersion);
         Check(ModJsonConfig.TryLoadFromFile(Path.Combine(root, "config.json"), "TrainParameterMod", out var config, out var error), "native config schema parses: " + error);
         Check(config.Parameters.Count == 6, "six native settings");
         foreach (var key in config.Parameters.Keys) Check(config.GetDouble(key) == 1, key + " vanilla default");
@@ -205,8 +211,8 @@ internal static class Program
         var context = new Mafi.Unity.InputControl.ControllerContext(input, null!, null!, null!);
         var menu = new LiveTrainSettingsMenu(mod, context);
         Check(ReferenceEquals(recorder.Registered, menu), "live menu registers with the native input manager");
-        var bindings = recorder.Keys!(null!);
-        Check(bindings.Primary.IsCode(UnityEngine.KeyCode.F8) && bindings.Mode == Mafi.Unity.InputControl.ShortcutMode.Game,
+        var shortcut = recorder.Shortcut!;
+        Check(shortcut.Default.Primary.IsCode(UnityEngine.KeyCode.F8) && shortcut.Mode == Mafi.Unity.InputControl.ShortcutMode.Game,
             "native shortcut opens live settings with F8 in game mode");
         Check(menu.Config.BlockShortcuts && menu.Config.DisableCameraControl,
             "typing into the live menu cannot trigger build or camera shortcuts");
@@ -248,13 +254,13 @@ internal static class Program
     {
         internal object? Registered;
         internal object? Removed;
-        internal Func<Mafi.Unity.InputControl.ShortcutsManager, Mafi.Unity.InputControl.KeyBindings>? Keys;
+        internal Mafi.Unity.InputControl.KbHandle? Shortcut;
 
         protected override object? Invoke(MethodInfo? targetMethod, object?[]? args)
         {
             if (targetMethod!.Name == "RegisterGlobalShortcut")
             {
-                Keys = (Func<Mafi.Unity.InputControl.ShortcutsManager, Mafi.Unity.InputControl.KeyBindings>)args![0]!;
+                Shortcut = (Mafi.Unity.InputControl.KbHandle)args![0]!;
                 Registered = args[1];
             }
             if (targetMethod.Name == "RemoveGlobalShortcut") Removed = args![0];

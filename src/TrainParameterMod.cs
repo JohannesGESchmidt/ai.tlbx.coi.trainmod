@@ -55,10 +55,12 @@ public sealed class TrainParameterMod : DataOnlyMod, IMod
     // so GameBuilder invokes it after all native InitAfterLoad callbacks have completed.
     void IMod.Initialize(DependencyResolver resolver, bool gameWasLoaded) => InitializeGameState(
         resolver.Resolve<PropsDb>(), resolver.Resolve<TrainsManager>(),
-        resolver.Resolve<ISimLoopEvents>(), resolver.Resolve<IGameLoopEvents>(), resolver);
+        resolver.Resolve<ISimLoopEvents>(), resolver.Resolve<IGameLoopEvents>(), resolver,
+        resolver.Resolve<IShortcutsRegistry>());
 
     internal void InitializeGameState(PropsDb loadedProperties, TrainsManager loadedTrains,
-        ISimLoopEvents loadedSimEvents, IGameLoopEvents gameLoop, DependencyResolver resolver)
+        ISimLoopEvents loadedSimEvents, IGameLoopEvents gameLoop, DependencyResolver resolver,
+        IShortcutsRegistry shortcuts)
     {
         try
         {
@@ -70,6 +72,8 @@ public sealed class TrainParameterMod : DataOnlyMod, IMod
             simEvents.UpdateBeforeCmdProc.AddNonSaveable(this, ProcessSettings);
             JsonConfig.OnValueChanged += OnSettingChanged;
             Active = this;
+            // The registration session closes before renderer initialization begins.
+            shortcuts.Add(this, LiveTrainSettingsMenu.OpenSettingsShortcut);
             gameLoop.RegisterRendererInitState(this, InitializeMenu(resolver));
             Log.Info("Train Parameter Mod: active; live settings available with F8 or from the pause menu.");
         }

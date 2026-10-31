@@ -12,6 +12,7 @@ using Mafi.Core.Mods;
 using Mafi.Core.PropertiesDb;
 using Mafi.Core.Simulation;
 using Mafi.Core.Trains;
+using Mafi.Unity.InputControl;
 using TrainParameterMod;
 
 internal static class LoadLifecycleChecks
@@ -27,6 +28,7 @@ internal static class LoadLifecycleChecks
         var simRecorder = (SimRecorder)(object)sim;
         var loop = DispatchProxy.Create<IGameLoopEvents, LoopRecorder>();
         var loopRecorder = (LoopRecorder)(object)loop;
+        var shortcuts = new ShortcutRecorder(loopRecorder);
         var mod = CreateMod(root);
         try
         {
@@ -49,10 +51,13 @@ internal static class LoadLifecycleChecks
             check(mapping.TargetMethods[initializeIndex].DeclaringType == mod.GetType(), "GameBuilder's IMod.Initialize dispatch reaches the mod instead of DataOnlyMod's empty method");
             // DependencyResolverBuilder requires a running game. Supply native objects plus loop stubs
             // to the same late-init body, without bypassing the game's integrity/runtime checks.
-            mod.InitializeGameState(properties, trains, sim, loop, null!);
+            mod.InitializeGameState(properties, trains, sim, loop, null!, shortcuts);
             check(capacity.Value == TrainSettings.Factor(2), "loaded-save Initialize applies restored capacity only after property repair");
             check(TrainParameterMod.TrainParameterMod.Settings.Speed == 2, "resuming automatically publishes saved settings in the late init phase");
             check(loopRecorder.RendererRegistrations == 1, "loaded game schedules live menu initialization after state is ready");
+            check(ReferenceEquals(shortcuts.Owner, mod) && ReferenceEquals(shortcuts.Shortcut, LiveTrainSettingsMenu.OpenSettingsShortcut)
+                && shortcuts.RendererRegistrationsAtAdd == 0,
+                "native shortcut is registered for the mod during Initialize, before renderer initialization");
             mod.QueueSettings(TrainSettings.Vanilla);
             simRecorder.BeforeCommands.Fire();
             check(capacity.Value == Percent.Hundred, "real registered pre-command callback applies live changes after load");
@@ -67,7 +72,7 @@ internal static class LoadLifecycleChecks
             try
             {
                 // If the game really cannot supply the property, cleanup must preserve the original error.
-                failedMod.InitializeGameState(properties, trains, sim, loop, null!);
+                failedMod.InitializeGameState(properties, trains, sim, loop, null!, shortcuts);
                 check(false, "missing native property must fail explicitly");
             }
             catch (KeyNotFoundException ex)
@@ -123,7 +128,7 @@ internal static class LoadLifecycleChecks
             var capacity = new PropertyPercentMult(IdsCore.PropertyIds.TrainsCapacityMultiplier.Value, Percent.Hundred, new Notifications());
             capacity.AddOrSetModifier("existing-difficulty", TrainSettings.Factor(0.5), default);
             table.Add(capacity.Id, capacity);
-            mod.InitializeGameState(properties, trains, sim, loop, null!);
+            mod.InitializeGameState(properties, trains, sim, loop, null!, new ShortcutRecorder());
             check(capacity.Value == TrainSettings.Factor(1.5), "first-add default capacity preserves existing difficulty or research modifiers");
             check(train.MaxSpeed == trainData.MaxBackwardSpeedCombined, "first add initializes an existing reversed train at its native speed");
 
@@ -146,7 +151,7 @@ internal static class LoadLifecycleChecks
                     saved.Loading == 4 && saved.Unloading == 5, "next load restores all six values through native config attachment after first add");
                 check(ReferenceEquals(restoredConfigs[0], worldConfig), "next load still retains the pre-existing world config");
                 ((IMod)resumed).EarlyInit(null!);
-                resumed.InitializeGameState(properties, trains, sim, loop, null!);
+                resumed.InitializeGameState(properties, trains, sim, loop, null!, new ShortcutRecorder());
                 check(capacity.Value == TrainSettings.Factor(3), "resuming replaces the saved owned capacity modifier without compounding bonuses");
                 check(train.MaxSpeed == trainData.MaxBackwardSpeedCombined.ScaledBy(TrainSettings.Factor(3)),
                     "resuming reapplies the saved speed multiplier once to the existing train");
@@ -197,6 +202,21 @@ internal static class LoadLifecycleChecks
     private sealed class Notifications : IPropertiesDbInternal
     {
         public void OnPropertyChanged(IProperty property, ImmutableArray<Type> types) { }
+    }
+
+    private sealed class ShortcutRecorder : IShortcutsRegistry
+    {
+        private readonly LoopRecorder? loop;
+        internal IMod? Owner;
+        internal KbHandle? Shortcut;
+        internal int RendererRegistrationsAtAdd;
+        internal ShortcutRecorder(LoopRecorder? loop = null) { this.loop = loop; }
+        public void Add(IMod owner, KbHandle handle)
+        {
+            Owner = owner;
+            Shortcut = handle;
+            RendererRegistrationsAtAdd = loop?.RendererRegistrations ?? 0;
+        }
     }
 
     public class SimRecorder : DispatchProxy

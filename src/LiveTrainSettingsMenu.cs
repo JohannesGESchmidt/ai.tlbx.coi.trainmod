@@ -7,13 +7,19 @@ namespace TrainParameterMod;
 /// <summary>Uses the game's input/window lifecycle; opening this controller does not request a pause.</summary>
 internal sealed class LiveTrainSettingsMenu : WindowController<TrainSettingsWindow>, IDisposable
 {
+    internal static readonly KbHandle OpenSettingsShortcut = KbHandleBuilder
+        .Start("TrainParameterMod.OpenSettings", "Train Parameter Mod")
+        .SetGroup(KbGroups.Windows)
+        .SetMode(ShortcutMode.Game)
+        .SetPrimary(KeyCode.F8)
+        .Build();
+
     private readonly TrainParameterMod mod;
 
     internal LiveTrainSettingsMenu(TrainParameterMod mod, ControllerContext context) : base(context, MenuConfig())
     {
         this.mod = mod;
-        context.InputManager.RegisterGlobalShortcut(
-            _ => KeyBindings.FromKey(KbCategory.Windows, ShortcutMode.Game, KeyCode.F8), this);
+        context.InputManager.RegisterGlobalShortcut(OpenSettingsShortcut, this);
     }
 
     private static ControllerConfig MenuConfig()

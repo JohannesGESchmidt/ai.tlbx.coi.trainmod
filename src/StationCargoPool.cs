@@ -12,12 +12,9 @@ internal static class StationCargoPool
 {
     private static readonly AccessTools.FieldRef<TrainStationModule, TrainStationManager> Manager =
         AccessTools.FieldRefAccess<TrainStationModule, TrainStationManager>("m_stationManager");
-    private static readonly AccessTools.FieldRef<TrainStationModule, Option<ProductBuffer>> Buffer =
-        AccessTools.FieldRefAccess<TrainStationModule, Option<ProductBuffer>>("m_buffer");
-
     internal static void Prepare(TrainStationModule station)
     {
-        var local = Buffer(station).ValueOrNull;
+        var local = station.Buffer.ValueOrNull;
         if (local == null || station.IsNotEnabled || station.IsBalancingDisabled) return;
         // Keep fractional transfer carry available, too. Never move more than a local batch needs.
         var batch = station.TransferQuantity.IntegerPart + 1.Quantity();
@@ -29,7 +26,7 @@ internal static class StationCargoPool
     }
 
     private static bool PrepareInList(IIndexable<TrainStationGroup.StationAndDirection> entries,
-        TrainStationModule station, ProductBuffer local, Quantity batch)
+        TrainStationModule station, IMixedProductBuffer local, Quantity batch)
     {
         for (var index = 0; index < entries.Count; index++)
         {
@@ -40,8 +37,9 @@ internal static class StationCargoPool
                 {
                     var entry = entries[i];
                     if (!(entry.Station is TrainStationModule other) || other.IsNotEnabled || other.IsBalancingDisabled
-                        || other.IsForLoading != station.IsForLoading || Side(entry) != Side(entries[index])) break;
-                    var buffer = Buffer(other).ValueOrNull;
+                        || other.IsForLoading != station.IsForLoading || other.IsRadiationShielded != station.IsRadiationShielded
+                        || Side(entry) != Side(entries[index])) break;
+                    var buffer = other.Buffer.ValueOrNull;
                     if (buffer == null || buffer.Product != local.Product) break;
                     var needed = batch - (station.IsForLoading ? local.Quantity : local.UsableCapacity);
                     if (needed.IsNotPositive) return true;
@@ -56,11 +54,10 @@ internal static class StationCargoPool
     private static int Side(TrainStationGroup.StationAndDirection entry) =>
         (entry.Direction == TrainTrackTrajectoryDirection.Forward ? 0 : 1) ^ (entry.Station.Transform.IsReflected ? 1 : 0);
 
-    private static void Move(ProductBuffer source, ProductBuffer target, Quantity needed)
+    private static void Move(IMixedProductBuffer source, IMixedProductBuffer target, Quantity needed)
     {
-        var moved = source.RemoveAsMuchAs_DoNotReport(needed.Min(source.Quantity).Min(target.UsableCapacity));
-        var remainder = target.StoreAsMuchAs_DoNotReport(moved);
-        if (remainder.IsPositive) source.StoreAsMuchAs_DoNotReport(remainder);
+        // The native transfer preserves the individual products inside a mixed cargo buffer.
+        source.TransferTo(target, needed.Min(source.Quantity).Min(target.UsableCapacity), doNotReport: true);
     }
 
     // Native requests reject an empty/full local buffer before a cargo cycle even starts.

@@ -18,6 +18,7 @@ internal static class MovementAndCargoChecks
 {
     private static readonly string Owner = "TrainParameterMod.Tests.PhysicsEnvironment";
     private delegate Fix64 PhysicsStep(Train train, RelTile1f target, out Fix64 acceleration);
+    private delegate Fix64 NativePhysicsStep(Train train, RelTile1f target, out Fix64 acceleration, out bool coastingToSpeedLimit);
 
     internal static void Run(Action<bool, string> check)
     {
@@ -57,7 +58,9 @@ internal static class MovementAndCargoChecks
         Set(train, "m_speed", start);
         Set(train, "<Speed>k__BackingField", start.ToFix32().Tiles());
         Set(train, "<TargetSpeed>k__BackingField", Fix32.One.Tiles());
-        var step = AccessTools.MethodDelegate<PhysicsStep>(AccessTools.Method(typeof(Train), "updateTrainMovementPhysics"));
+        var nativeStep = AccessTools.MethodDelegate<NativePhysicsStep>(AccessTools.Method(typeof(Train), "updateTrainMovementPhysics"));
+        PhysicsStep step = (Train current, RelTile1f targetSpeed, out Fix64 acceleration) =>
+            nativeStep(current, targetSpeed, out acceleration, out _);
         Settings(1, 1, 1);
         TrainPatches.RefreshBraking(train);
         var vanilla = step(train, Fix32.One.Tiles(), out var vanillaAcceleration);
@@ -97,6 +100,12 @@ internal static class MovementAndCargoChecks
         check(data.MaxBrakingForceKn == nativeBrakeForce && train.BrakingDistance == vanillaDistance,
             "reset restores original brake force and native stopping distance");
         check(step(train, Fix32.One.Tiles(), out _) == vanilla, "reset restores the exact native next-step speed");
+        Set(train, "<SpeedLimitAhead>k__BackingField", (start.ToFix32() / 2).Tiles());
+        var vanillaCoasting = nativeStep(train, Fix32.One.Tiles(), out _, out var coasting);
+        Settings(10, 1, 1);
+        var fastCoasting = nativeStep(train, Fix32.One.Tiles(), out _, out var stillCoasting);
+        check(coasting && stillCoasting && fastCoasting == vanillaCoasting,
+            "0.8.8 coasting toward a lower speed limit is preserved at 10x acceleration");
     }
 
     private static void CheckCargo(Action<bool, string> check)
@@ -134,6 +143,7 @@ internal static class MovementAndCargoChecks
         {
             Settings(1, rate, rate);
             var product = Empty<LooseProductProto>();
+            Set(product, nameof(ProductProto.IsStorable), true);
             var wagonProto = Empty<CargoWagonProto>();
             Set(wagonProto, "<Capacity>k__BackingField", (100 * count).Quantity());
             Set(wagonProto, "<SubCarCapacity>k__BackingField", 100.Quantity());
@@ -173,10 +183,12 @@ internal static class MovementAndCargoChecks
                 Set(station, "m_buffer", Option<ProductBuffer>.Create(buffer));
                 entries.Add(new TrainStationGroup.StationAndDirection(station, TrainTrackTrajectoryDirection.Forward));
                 groups.Add(station, group);
-                cars[i] = new CargoWagon.SubCargoWagon(wagon, i, new ProductQuantity(product, (loading ? 0 : 100).Quantity()), default);
+                cars[i] = new CargoWagon.SubCargoWagon(wagon, i, default);
                 cars[i].SetAlignedStation(Option<ITrainStationModule>.Create(station));
             }
             wagon.SubCars = new ImmutableArray<TrainCarBase.TrainSubCarBase>(cars);
+            foreach (var car in cars)
+                car.SetCargoNoChecks(new ProductQuantity(product, (loading ? 0 : 100).Quantity()));
             if (count == 4 && loading && rate == 1)
             {
                 var target = stations[3];
@@ -192,6 +204,10 @@ internal static class MovementAndCargoChecks
                 StationCargoPool.Prepare(target);
                 check(buffers[3].Quantity.IsZero, "loading and unloading modules have separate pools");
                 Set(stations[1], "<IsForLoading>k__BackingField", true);
+                Set(stations[1].Prototype, "IsRadiationShielded", true);
+                StationCargoPool.Prepare(target);
+                check(buffers[3].Quantity.IsZero, "pool does not cross a radiation-shielding boundary");
+                Set(stations[1].Prototype, "IsRadiationShielded", false);
                 var otherProduct = Empty<LooseProductProto>();
                 Set(otherProduct, "<Id>k__BackingField", new Mafi.Core.Prototypes.Proto.ID("OtherProduct"));
                 Set(stations[1], "m_buffer", Option<ProductBuffer>.Create(new ProductBuffer(100.Quantity(), otherProduct)));
@@ -255,6 +271,7 @@ internal static class MovementAndCargoChecks
     {
         Settings(1, loading ? rate : 1, loading ? 1 : rate);
         var product = Empty<LooseProductProto>();
+        Set(product, nameof(ProductProto.IsStorable), true);
         var wagonProto = Empty<CargoWagonProto>();
         Set(wagonProto, "<Capacity>k__BackingField", 100.Quantity());
         Set(wagonProto, "<SubCarCapacity>k__BackingField", 100.Quantity());
@@ -262,8 +279,9 @@ internal static class MovementAndCargoChecks
         var wagon = Empty<CargoWagon>();
         Set(wagon, "<Prototype>k__BackingField", wagonProto);
         typeof(TrainCarBase).GetField("<Prototype>k__BackingField", BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(wagon, wagonProto);
-        var car = new CargoWagon.SubCargoWagon(wagon, 0, new ProductQuantity(product, (loading ? 0 : 100).Quantity()), default);
+        var car = new CargoWagon.SubCargoWagon(wagon, 0, default);
         wagon.SubCars = new ImmutableArray<TrainCarBase.TrainSubCarBase>(new TrainCarBase.TrainSubCarBase[] { car });
+        car.SetCargoNoChecks(new ProductQuantity(product, (loading ? 0 : 100).Quantity()));
         var proto = Empty<TrainStationModuleProto>();
         Set(proto, "TransferPeriod", 20.Ticks());
         Set(proto, "ConnectionCompletionPerStepWhenLoading", 10.Percent());
@@ -289,7 +307,7 @@ internal static class MovementAndCargoChecks
             else CargoCyclePatches.AdvanceUnloading(station, wagon, 0);
             ticks++;
         }
-        if (ticks == 10000) throw new InvalidOperationException("Native cargo cycle did not complete.");
+        if (ticks == 10000) throw new InvalidOperationException($"Native cargo cycle did not complete: loading={loading}, rate={rate}, cargo={car.Cargo.Quantity}, buffer={buffer.Quantity}, connection={station.ConnectionPercent}, timer={AccessTools.Field(typeof(TrainStationModule), "m_loadUnloadTimer").GetValue(station)}, canReceive={car.CanReceive(product)}.");
         if (car.Cargo.Quantity + buffer.Quantity != 100.Quantity()) throw new InvalidOperationException("Cargo was lost or manufactured.");
         disconnectTicks = 0;
         while (!station.CanReleaseWagon && disconnectTicks < 10000)
