@@ -4,13 +4,13 @@
 
 A standalone C# mod for **Captain of Industry** with six adjustable train
 parameters in a live in-game window. Parameter defaults are all 1.
-Built against **0.8.8 / Update 4.3** (build 624). Version 0.1.6 requires 0.8.8.
+Built against **0.8.8c / Update 4.3** (Steam build 26502520). Version 0.1.7 requires 0.8.8 or later; verified through 0.8.8c.
 Experimental game APIs may change in later versions.
 
 [COI Hub page](https://coigame.com/Mod/1253/Train-Parameter-Mod)
 
 **Validation status:** build and 170 headless integration checks pass against the
-installed game assemblies, including the menu constructor hook, native F8
+installed 0.8.8c game assemblies, including the menu constructor hook, native F8
 registration, simulation-side application, saved-value round-trip, and the load
 lifecycle with a capacity property missing until native post-load repair. The tests
 now execute native movement and complete cargo transfers: loading and unloading
@@ -51,6 +51,10 @@ modules. Acceleration preserves the game's new coasting-to-speed-limit state.
 Version **0.1.6** adds the COI Hub-compatible `changelog.txt` to the release ZIP
 and checks that its latest entry matches the mod version. Gameplay is unchanged.
 
+Version **0.1.7** is rebuilt and verified against game 0.8.8c. It updates the
+maximum verified game version and integration-test target; gameplay is unchanged.
+The 0.8.8c verification is headless; in-game visual acceptance has not been repeated.
+
 | Setting | Range | Effect |
 | --- | --- | --- |
 | Curve slowdown factor | 0–5 | 1 = vanilla; 0 = no curve-specific speed cap; 0.5 = double the curve limit; 2 = half |
@@ -90,7 +94,7 @@ dotnet build TrainParameterMod.sln -c Release
 ```
 
 `Build.ps1` builds the solution, runs integration checks against your installed game
-assemblies, and creates `dist/TrainParameterMod-0.1.6.zip`, including the changelog
+assemblies, and creates `dist/TrainParameterMod-0.1.7.zip`, including the changelog
 next to `manifest.json` for the COI Hub Changelog tab.
 Pass `-GameRoot 'D:\SteamLibrary\steamapps\common\Captain of Industry'` for a custom install.
 

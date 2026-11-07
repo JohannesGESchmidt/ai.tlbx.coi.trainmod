@@ -1,3 +1,8 @@
+v0.1.7 | 2026-11-07
+* Rebuilt and verified against Captain of Industry 0.8.8c (Update 4.3 hotfix).
+* Raised the maximum verified game version to 0.8.8c.
+* All 170 headless integration checks pass against the updated game assemblies; no gameplay changes.
+
 v0.1.6 | 2026-10-31
 * Added a COI Hub changelog covering all mod versions.
 * Included changelog.txt in release ZIPs; builds now check that its latest entry matches the mod version.

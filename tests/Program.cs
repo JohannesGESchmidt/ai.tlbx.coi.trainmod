@@ -36,7 +36,7 @@ internal static class Program
     {
         var gameVersion = typeof(Mafi.AssemblyInfo)
             .GetField("VERSION_FULL")!.GetRawConstantValue();
-        Check(Equals(gameVersion, "0.8.8"), "integration checks use Captain of Industry 0.8.8: " + gameVersion);
+        Check(Equals(gameVersion, "0.8.8c"), "integration checks use Captain of Industry 0.8.8c: " + gameVersion);
         Check(ModJsonConfig.TryLoadFromFile(Path.Combine(root, "config.json"), "TrainParameterMod", out var config, out var error), "native config schema parses: " + error);
         Check(config.Parameters.Count == 6, "six native settings");
         foreach (var key in config.Parameters.Keys) Check(config.GetDouble(key) == 1, key + " vanilla default");

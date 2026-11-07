@@ -1,6 +1,6 @@
 {
   "id": "TrainParameterMod",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "display_name": "Train Parameter Mod",
   "description_short": "Tune train curves, acceleration, wagon capacity, speed, loading and unloading live with F8. No save or reload needed.",
   "description_long": "Adjust six train parameters live with F8: curve slowdown, acceleration and braking, wagon capacity, top speed, loading speed and unloading speed. Settings are stored by the game with your save.\n\nCOI Hub code analysis: why these capabilities are used\n\nUses Harmony: The mod patches train and station methods while the game is running so the selected multipliers affect existing trains and cargo cycles. Harmony also adds the settings entry to the pause menu.\n\nGenerates code at runtime: Harmony and its access helpers create method wrappers and delegates in memory to apply these patches and call internal game methods. The patch definitions are included in the mod's source code.\n\nUses reflection by name: The mod looks up specific train and station methods, fields and property setters for speed, braking, cargo timing and connected station buffers, where the required operations are not exposed through public APIs. These lookup names are fixed in the source code.\n\nSource code: https://github.com/JohannesGESchmidt/ai.tlbx.coi.trainmod",
@@ -8,7 +8,7 @@
   "authors": "ai.tlbx",
   "primary_dlls": ["0Harmony.dll", "TrainParameterMod.dll"],
   "min_game_version": "0.8.8",
-  "max_verified_game_version": "0.8.8",
+  "max_verified_game_version": "0.8.8c",
   "non_locking_dll_load": true,
   "can_add_to_saved_game": true,
   "can_remove_from_saved_game": false
